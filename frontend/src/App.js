@@ -58,16 +58,33 @@ export default function TrackPlayApp() {
     }, 150);
   };
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
       setIsUploading(true);
       
-      // Simulate upload and extracting frames
-      setTimeout(() => {
+      try {
+        const formData = new FormData();
+        formData.append('file', e.target.files[0]);
+        
+        const response = await fetch('http://localhost:8000/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const data = await response.json();
+        const videoId = data.video_id;
+        
+        // Store video ID for later use
+        localStorage.setItem('current_video_id', videoId);
+        
         setIsUploading(false);
         setCurrentStage(STAGES.FRAME_SELECT);
-      }, 2000);
+      } catch (error) {
+        console.error('Upload failed:', error);
+        setIsUploading(false);
+        alert('Upload failed. Make sure backend is running on localhost:8000');
+      }
     }
   };
 
