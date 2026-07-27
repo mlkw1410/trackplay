@@ -36,26 +36,59 @@ export default function TrackPlayApp() {
   const [selectedFrame, setSelectedFrame] = useState(null);
   const [clickCoords, setClickCoords] = useState(null);
   const [progress, setProgress] = useState(0);
+  const [videoId, setVideoId] = useState(null);
+  const [frameUrls, setFrameUrls] = useState([]);
   
   // Ref for the player selection canvas
   const canvasRef = useRef(null);
 
   // Simulate backend processing
-  const startProcessing = () => {
+  const startProcessing = async () => {
     setCurrentStage(STAGES.PROCESSING);
     setProgress(0);
     
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress += Math.random() * 5;
-      if (currentProgress >= 100) {
-        clearInterval(interval);
-        setProgress(100);
-        setTimeout(() => setCurrentStage(STAGES.RESULTS), 800);
-      } else {
-        setProgress(currentProgress);
-      }
-    }, 150);
+    try {
+      // Call backend tracking endpoint
+      const response = await fetch(`http://localhost:8000/api/track/${videoId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      const jobId = data.job_id;
+      
+      console.log('Tracking started, job ID:', jobId);
+      
+      // Poll for progress
+      const pollInterval = setInterval(async () => {
+        try {
+          const progressResponse = await fetch(`http://localhost:8000/api/progress/${jobId}`);
+          const progressData = await progressResponse.json();
+          
+          console.log('Job status:', progressData.status, 'Progress:', progressData.progress);
+          setProgress(progressData.progress);
+          
+          if (progressData.status === 'completed') {
+            clearInterval(pollInterval);
+            setProgress(100);
+            setTimeout(() => setCurrentStage(STAGES.RESULTS), 800);
+          } else if (progressData.status === 'error') {
+            clearInterval(pollInterval);
+            console.error('Tracking failed:', progressData.error);
+            alert('Tracking failed: ' + progressData.error);
+            setCurrentStage(STAGES.PLAYER_SELECT);
+          }
+        } catch (error) {
+          console.error('Progress check failed:', error);
+        }
+      }, 500);
+      
+    } catch (error) {
+      console.error('Tracking start failed:', error);
+      alert('Failed to start tracking. Make sure backend is running.');
+      setCurrentStage(STAGES.PLAYER_SELECT);
+    }
   };
 
   const handleFileUpload = async (e) => {
@@ -73,10 +106,17 @@ export default function TrackPlayApp() {
         });
         
         const data = await response.json();
-        const videoId = data.video_id;
+        const vid = data.video_id;
         
-        // Store video ID for later use
-        localStorage.setItem('current_video_id', videoId);
+        setVideoId(vid);
+        localStorage.setItem('current_video_id', vid);
+        
+        // Fetch frames after upload
+        console.log('Fetching frames...');
+        const framesResponse = await fetch(`http://localhost:8000/api/frames/${vid}`);
+        const framesData = await framesResponse.json();
+        setFrameUrls(framesData.frames);
+        console.log('✓ Frames fetched:', framesData.frames);
         
         setIsUploading(false);
         setCurrentStage(STAGES.FRAME_SELECT);
@@ -88,22 +128,62 @@ export default function TrackPlayApp() {
     }
   };
 
-  const handleFrameSelect = (index) => {
+  const handleFrameSelect = async (index) => {
     setSelectedFrame(index);
+    
+    // Send frame selection to backend
+    try {
+      const response = await fetch('http://localhost:8000/api/select-frame', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          video_id: videoId,
+          frame_index: index
+        })
+      });
+      const data = await response.json();
+      console.log('✓ Frame selected on backend:', data);
+    } catch (error) {
+      console.error('Frame selection failed:', error);
+    }
   };
 
-  const handlePlayerClick = (e) => {
+  const handlePlayerClick = async (e) => {
     if (!canvasRef.current) return;
     
     const rect = canvasRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    // Convert to percentages for responsive drawing
-    setClickCoords({
-      x: (x / rect.width) * 100,
-      y: (y / rect.height) * 100
-    });
+    // Convert to pixel coordinates (not percentages for backend)
+    const coords = {
+      x: Math.round(x),
+      y: Math.round(y)
+    };
+    
+    setClickCoords(coords);
+    
+    // Send player selection to backend
+    try {
+      const response = await fetch('http://localhost:8000/api/select-player', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          video_id: videoId,
+          x: coords.x,
+          y: coords.y,
+          frame_index: selectedFrame
+        })
+      });
+      const data = await response.json();
+      console.log('✓ Player selected on backend:', data);
+    } catch (error) {
+      console.error('Player selection failed:', error);
+    }
   };
 
   const resetFlow = () => {
@@ -111,6 +191,9 @@ export default function TrackPlayApp() {
     setSelectedFrame(null);
     setClickCoords(null);
     setProgress(0);
+    setVideoId(null);
+    setFrameUrls([]);
+    localStorage.removeItem('current_video_id');
     setCurrentStage(STAGES.UPLOAD);
   };
 
@@ -155,8 +238,6 @@ export default function TrackPlayApp() {
 
   // SCREEN 2: FRAME SELECTION
   const renderFrameSelection = () => {
-    const frames = Array.from({ length: 10 }, (_, i) => i);
-    
     return (
       <div className="flex flex-col h-full animate-in fade-in duration-300 pixel-box border-neon-pink bg-arcade-dark p-6 relative">
         <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end border-b-4 border-pink-900 border-dashed pb-4 gap-4">
@@ -178,7 +259,7 @@ export default function TrackPlayApp() {
         </div>
         
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 overflow-y-auto pr-2 arcade-scrollbar p-2">
-          {frames.map((index) => (
+          {frameUrls.map((frameUrl, index) => (
             <div 
               key={index}
               onClick={() => handleFrameSelect(index)}
@@ -188,12 +269,23 @@ export default function TrackPlayApp() {
                   : 'border-2 border-cyan-900 hover:border-cyan-400'
               }`}
             >
-              <div className="absolute inset-0 flex items-center justify-center opacity-30 scanline-bg">
-                 <Video className="w-8 h-8 text-cyan-500" strokeWidth={1.5} />
-              </div>
+              {/* Frame image - ACTUAL IMAGE NOW */}
+              <img 
+                src={`http://localhost:8000${frameUrl}`}
+                alt={`Frame ${index}`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  console.error('Failed to load frame:', frameUrl, e);
+                  e.target.style.display = 'none';
+                }}
+              />
+              
+              {/* Label overlay */}
               <div className="absolute bottom-0 left-0 bg-black/80 border-t-2 border-r-2 border-cyan-900 font-pixel text-cyan-400 px-2 py-1 text-lg">
                 FRM_{String(index).padStart(2, '0')}
               </div>
+              
+              {/* Selection checkmark */}
               {selectedFrame === index && (
                 <div className="absolute top-1 right-1">
                   <CheckSquare className="w-6 h-6 text-green-400 fill-black" strokeWidth={2} />
@@ -239,18 +331,30 @@ export default function TrackPlayApp() {
           onClick={handlePlayerClick}
           ref={canvasRef}
         >
-           <div className="absolute inset-0 flex flex-col items-center justify-center opacity-40 scanline-bg">
+          {/* Show the selected frame as background */}
+          {selectedFrame !== null && frameUrls[selectedFrame] && (
+            <img 
+              src={`http://localhost:8000${frameUrls[selectedFrame]}`}
+              alt="Selected frame"
+              className="w-full h-full object-cover"
+            />
+          )}
+           
+           {!selectedFrame && (
+             <div className="absolute inset-0 flex flex-col items-center justify-center opacity-40 scanline-bg">
                <Maximize2 className="w-16 h-16 text-cyan-600 mb-4" strokeWidth={1} />
                <span className="font-pixel text-2xl text-cyan-600 uppercase tracking-widest">Video Output Feed</span>
-           </div>
+             </div>
+           )}
 
           {/* Retro Bounding Box */}
           {clickCoords && (
              <div 
               className="absolute pointer-events-none transition-all duration-75 z-10"
               style={{
-                left: `calc(${clickCoords.x}% - 40px)`,
-                top: `calc(${clickCoords.y}% - 80px)`,
+                left: `${clickCoords.x}px`,
+                top: `${clickCoords.y}px`,
+                transform: 'translate(-40px, -80px)',
                 width: '80px',
                 height: '160px',
               }}

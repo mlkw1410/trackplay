@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.env
+.env.*
+
+# Node / React
+node_modules/
+frontend/node_modules/
+frontend/build/
+
+# Local video data (kept locally for the app, excluded from Git)
+data/
+
+# Local model weights
+*.pt
