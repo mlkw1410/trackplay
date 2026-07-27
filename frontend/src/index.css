@@ -1,4 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+.font-arcade { font-family: 'Press Start 2P', cursive; line-height: 1.5; }
+.font-pixel { font-family: 'VT323', monospace; }
+.bg-arcade-dark { background-color: #0b0710; }
+
+.text-shadow-cyan { text-shadow: 2px 2px 0 #005555, 0 0 10px #00f3ff; }
+.text-shadow-pink { text-shadow: 2px 2px 0 #550055, 0 0 10px #ff00ff; }
+.text-shadow-yellow { text-shadow: 2px 2px 0 #554400, 0 0 10px #ffe600; }
+
+.neon-box-cyan { box-shadow: 0 0 10px #00f3ff20, inset 0 0 10px #00f3ff20; }
+.neon-box-pink { box-shadow: 0 0 10px #ff00ff20, inset 0 0 10px #ff00ff20; }
+.neon-box-yellow { box-shadow: 0 0 10px #ffe60020, inset 0 0 10px #ffe60020; }
+.neon-box-green { box-shadow: 0 0 10px #39ff1420, inset 0 0 10px #39ff1420; }
+
+.border-neon-cyan { border: 4px solid #00f3ff; }
+.border-neon-pink { border: 4px solid #ff00ff; }
+.border-neon-yellow { border: 4px solid #ffe600; }
+
+.pixel-box {
+  position: relative;
+  clip-path: polygon(
+    0 8px, 8px 8px, 8px 0,
+    calc(100% - 8px) 0, calc(100% - 8px) 8px, 100% 8px,
+    100% calc(100% - 8px), calc(100% - 8px) calc(100% - 8px), calc(100% - 8px) 100%,
+    8px 100%, 8px calc(100% - 8px), 0 calc(100% - 8px)
+  );
+}
+
+.scanline-bg {
+  background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+  background-size: 100% 4px;
+}
+
+.grid-bg {
+  background-image: linear-gradient(to right, #330033 1px, transparent 1px), linear-gradient(to bottom, #330033 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.blink-slow { animation: blink 2s step-end infinite; }
+.blink-fast { animation: blink 0.5s step-end infinite; }
+.blink-fast-hover:hover { animation: blink 0.2s step-end infinite; }
+
+.arcade-scrollbar::-webkit-scrollbar { width: 12px; }
+.arcade-scrollbar::-webkit-scrollbar-track { background: #000; border-left: 2px solid #333; }
+.arcade-scrollbar::-webkit-scrollbar-thumb { background: #ff00ff; border: 2px solid #000; }
